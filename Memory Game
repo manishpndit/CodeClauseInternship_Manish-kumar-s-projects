@@ -1,0 +1,334 @@
+//Making a memory based game using html,css and javascript to match the cards to their same number cards within 60sec.
+//html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Game</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Memory Game</h1>
+        <div class="info">
+            <span>Score: <span id="score">0</span></span>  //scorecard
+            <span>Time: <span id="timer">00:00</span></span> //timer
+            <button id="reset">Reset</button>  //rset button
+        </div>
+        <div class="game-board" id="game-board">
+            <!-- Cards will be inserted here -->
+        </div>
+    </div>
+    <div id="win-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Congratulations!</h2>
+            <p>You won the game!</p>
+            <button id="play-again">Play Again</button>
+        </div>
+    </div>
+     </div>
+    <div id="lose-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Time's Up!</h2>
+            <p>You ran out of time. Better luck next time!</p>
+            <button id="play-again-lose">Play Again</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
+//css
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #f5f5f5;
+    background-image: url('background.jpg'); /* Add a background image */
+    background-size: cover;
+}
+
+.container {
+    text-align: center;
+}
+
+.game-board {
+    display: grid;
+    grid-template-columns: repeat(4, 100px);
+    gap: 10px;
+    justify-content: center;
+    margin: 20px auto;
+    perspective: 1000px; /* Perspective for 3D flip effect */
+}
+
+.card {
+    width: 100px;
+    height: 100px;
+    background-color: #007bff;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: transform 0.5s, background-color 0.5s;
+    transform-style: preserve-3d;
+    position: relative;
+}
+
+.card.flipped {
+    transform: rotateY(180deg);
+    background-color: #ffffff;
+    color: #000000;
+}
+
+.card .front, .card .back {
+    position: absolute;
+    width: 100px;
+    height: 100px;
+    backface-visibility: hidden;
+}
+
+.card .back {
+    background-color: #007bff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.card .front {
+    background-color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: rotateY(180deg);
+}
+
+.info {
+    margin-bottom: 20px;
+}
+
+button {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    text-align: center;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+//javascript
+const board = document.getElementById('game-board');
+const scoreDisplay = document.getElementById('score');
+const timerDisplay = document.getElementById('timer');
+const resetButton = document.getElementById('reset');
+const winModal = document.getElementById('win-modal');
+const loseModal = document.getElementById('lose-modal');
+const closeWinModal = document.querySelector('#win-modal .close');
+const closeLoseModal = document.querySelector('#lose-modal .close');
+const playAgainButton = document.getElementById('play-again');
+const playAgainLoseButton = document.getElementById('play-again-lose');
+
+let cards = [];
+let firstCard, secondCard;
+let lockBoard = false;
+let score = 0;
+let timerInterval;
+let countdownInterval;
+let time = 0;
+let remainingTime = 60;
+
+// Initialize game
+function initGame() {
+    cards = [];
+    board.innerHTML = '';
+    score = 0;
+    scoreDisplay.textContent = score;
+    time = 0;
+    remainingTime = 60;
+    clearInterval(timerInterval);
+    clearInterval(countdownInterval);
+    timerDisplay.textContent = '00:00';
+
+    const cardValues = shuffle([...Array(8).keys()].flatMap(num => [num, num]));
+    cardValues.forEach(value => {
+        const card = document.createElement('div');
+        card.classList.add('card');
+        card.dataset.value = value;
+
+        // Front and Back sides of the card
+        card.innerHTML = `
+            <div class="front"></div>
+            <div class="back">${value}</div>
+        `;
+
+        card.addEventListener('click', flipCard);
+        board.appendChild(card);
+    });
+
+    startTimer();
+    startCountdown();
+}
+
+// Shuffle array function
+function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+// Flip card function
+function flipCard() {
+    if (lockBoard || this === firstCard || this.classList.contains('flipped')) return;
+
+    this.classList.add('flipped');
+    this.querySelector('.front').textContent = this.dataset.value;
+
+    if (!firstCard) {
+        firstCard = this;
+        return;
+    }
+
+    secondCard = this;
+    lockBoard = true;
+
+    checkMatch();
+}
+
+// Check if cards match
+function checkMatch() {
+    const isMatch = firstCard.dataset.value === secondCard.dataset.value;
+
+    if (isMatch) {
+        score++;
+        scoreDisplay.textContent = score;
+        checkWin();
+        resetBoard();
+    } else {
+        setTimeout(() => {
+            firstCard.classList.remove('flipped');
+            secondCard.classList.remove('flipped');
+            firstCard.querySelector('.front').textContent = '';
+            secondCard.querySelector('.front').textContent = '';
+            resetBoard();
+        }, 1000);
+    }
+}
+
+// Reset board state
+function resetBoard() {
+    [firstCard, secondCard, lockBoard] = [null, null, false];
+}
+
+// Start timer function
+function startTimer() {
+    timerInterval = setInterval(() => {
+        time++;
+        const minutes = String(Math.floor(time / 60)).padStart(2, '0');
+        const seconds = String(time % 60).padStart(2, '0');
+        timerDisplay.textContent = `${minutes}:${seconds}`;
+    }, 1000);
+}
+
+// Start countdown function
+function startCountdown() {
+    countdownInterval = setInterval(() => {
+        remainingTime--;
+        const minutes = String(Math.floor(remainingTime / 60)).padStart(2, '0');
+        const seconds = String(remainingTime % 60).padStart(2, '0');
+        timerDisplay.textContent = `${minutes}:${seconds}`;
+
+        if (remainingTime <= 0) {
+            clearInterval(countdownInterval);
+            clearInterval(timerInterval);
+            showLoseModal();
+        }
+    }, 1000);
+}
+
+// Check for win condition
+function checkWin() {
+    const totalCards = document.querySelectorAll('.card').length;
+    const flippedCards = document.querySelectorAll('.card.flipped').length;
+    
+    if (flippedCards === totalCards) {
+        clearInterval(timerInterval);
+        clearInterval(countdownInterval);
+        winModal.style.display = 'flex';
+    }
+}
+
+// Show lose modal
+function showLoseModal() {
+    loseModal.style.display = 'flex';
+}
+
+// Event listeners for modals and buttons
+resetButton.addEventListener('click', initGame);
+playAgainButton.addEventListener('click', () => {
+    winModal.style.display = 'none';
+    initGame();
+});
+playAgainLoseButton.addEventListener('click', () => {
+    loseModal.style.display = 'none';
+    initGame();
+});
+closeWinModal.addEventListener('click', () => {
+    winModal.style.display = 'none';
+});
+closeLoseModal.addEventListener('click', () => {
+    loseModal.style.display = 'none';
+});
+
+// Start initial game
+initGame();
